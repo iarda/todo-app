@@ -1,8 +1,9 @@
-export default function TodoCard({ todo, onToggle, onDelete, onDragStart }) {
+export default function TodoCard({ todo, onToggle, onDelete, onDragStart, onDragEnd }) {
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart(e, todo.id)}
+      onDragEnd={onDragEnd}
       className="group rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm hover:shadow transition"
     >
       <div className="flex items-start justify-between gap-3">

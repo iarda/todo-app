@@ -14,6 +14,7 @@ export default function App() {
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [draggingId, setDraggingId] = useState(null);
+  const [activeDropzone, setActiveDropzone] = useState(null);
 
   const { todoList, doneList } = useMemo(() => {
     const todoList = todos.filter((t) => t.status === "todo");
@@ -21,11 +22,19 @@ export default function App() {
     return { todoList, doneList };
   }, [todos]);
 
+  const draggingTodo = draggingId ? todos.find((t) => t.id === draggingId) : null;
+  const draggingStatus = draggingTodo?.status ?? null;
+
   function validate() {
     const trimmed = title.trim();
     if (!trimmed) return "Please enter a title.";
     if (trimmed.length < 3) return "At least 3 characters.";
     if (trimmed.length > 80) return "Maximum 80 characters.";
+
+    const normalized = trimmed.toLowerCase();
+    const exists = todos.some((t) => t.title.trim().toLowerCase() === normalized)
+    if (exists) return "To-Do already exists."
+
     return "";
   }
 
@@ -61,6 +70,7 @@ export default function App() {
 
   function onDragStart(e, id) {
     setDraggingId(id);
+    setActiveDropzone(null);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", id);
   }
@@ -76,8 +86,37 @@ export default function App() {
       if (!id) return;
 
       setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
+      setActiveDropzone(null);
       setDraggingId(null);
     };
+  }
+
+  function dragEnterZone(zone) {
+    return (e) => {
+      e.preventDefault();
+
+      if (!draggingStatus) return;
+
+      const isDroppable = 
+        (zone === "todo" && draggingStatus === "done") ||
+        (zone === "done" && draggingStatus === "todo");
+
+      if (isDroppable) setActiveDropzone(zone);
+    };
+  }
+ 
+  function dragLeaveZone(zone) {
+    return (e) => {
+      e.preventDefault();
+      const next = e.relatedTarget;
+      if (e.currentTarget && next && e.currentTarget.contains(next)) return;
+      setActiveDropzone((prev) => (prev === zone ? null : prev));
+    };
+  }
+
+  function endDrag() {
+    setDraggingId(null);
+    setActiveDropzone(null);
   }
 
   return (
@@ -89,7 +128,7 @@ export default function App() {
 
         <form
           onSubmit={addTodo}
-          className="mb-8 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm"
+          className="mb-8 rounded-3xl border border-neutral-200 bg-white p-5 pb-10 shadow-sm"
         >
           <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
             <TextInput
@@ -116,9 +155,14 @@ export default function App() {
         <div className="grid gap-4 md:grid-cols-2">
           <Column
             title={`To-Do (${todoList.length})`}
-            subtitle="Drop here"
             onDragOver={allowDrop}
+            onDragEnter={dragEnterZone("todo")}
+            onDragLeave={dragLeaveZone("todo")}
             onDropCard={dropTo("todo")}
+            showDropOverlay={!!draggingId && draggingStatus === "done"}
+            isActiveDropzone={
+              activeDropzone === "todo" && !!draggingId && draggingStatus === "done"
+            }
           >
             {todoList.length === 0 ? (
               <EmptyState text="Please Add a To-Do" />
@@ -130,6 +174,7 @@ export default function App() {
                   onToggle={toggleTodo}
                   onDelete={deleteTodo}
                   onDragStart={onDragStart}
+                  onDragEnd={endDrag}
                 />
               ))
             )}
@@ -137,9 +182,14 @@ export default function App() {
 
           <Column
             title={`Done (${doneList.length})`}
-            subtitle="Drop here"
             onDragOver={allowDrop}
+            onDragEnter={dragEnterZone("done")}
+            onDragLeave={dragLeaveZone("done")}
             onDropCard={dropTo("done")}
+            showDropOverlay={!!draggingId && draggingStatus === "todo"}
+            isActiveDropzone={
+              activeDropzone === "done" && !!draggingId && draggingStatus === "todo"
+            }
           >
             {doneList.length === 0 ? (
               <EmptyState text="Empty" />
@@ -151,6 +201,7 @@ export default function App() {
                   onToggle={toggleTodo}
                   onDelete={deleteTodo}
                   onDragStart={onDragStart}
+                  onDragEnd={endDrag}
                 />
               ))
             )}
